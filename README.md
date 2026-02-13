@@ -1,153 +1,65 @@
-# MonOCR ONNX: Universal OCR Package
+# MonOCR (Multi-Language SDK)
 
-**Production-ready OCR for the Mon (mnw) language, now available everywhere.**
+Universal OCR package for the Mon (mnw) language, powered by ONNX Runtime.
 
-This repository provides universal bindings for the MonOCR model using **ONNX Runtime**, allowing you to run high-performance OCR in Go, JavaScript (Node.js/Web), Python, and Rust.
+This repository contains SDKs for multiple languages, providing a unified API for high-performance OCR on images and PDFs.
 
-## What's Included
+## Supported Languages
 
-The `model/` directory contains everything you need:
+| Language       | Directory            | Package                            | Status     |
+| :------------- | :------------------- | :--------------------------------- | :--------- |
+| **JavaScript** | [`js/`](js/)         | `monocr` (npm)                     | ✅ Ready   |
+| **Python**     | [`python/`](python/) | `monocr-onnx` (PyPI)               | ✅ Ready   |
+| **Go**         | [`go/`](go/)         | `github.com/janakh/monocr-onnx/go` | ✅ Ready   |
+| **Rust**       | [`rust/`](rust/)     | `monocr` (crates.io)               | 🚧 Planned |
 
-- **`monocr.onnx`** (56 MB): The core ONNX model, supporting dynamic input widths.
-- **`monocr.tflite`** (14 MB): Quantized TFLite model, optimized for mobile/edge.
-- **`charset.txt`** (224 chars): The character mapping used by the model.
+## Features
 
-## Getting Started
+- **Unified API**: Consistent `read_image` and `read_pdf` functions across all languages.
+- **Auto-Download**: Automatically fetches the 56MB `monocr.onnx` model from HuggingFace on first use.
+- **Full Page Support**: Built-in layout analysis to handle multi-line documents.
+- **High Performance**: Optimized ONNX Runtime inference with connectionist temporal classification (CTC) decoding.
 
-Choose your language:
+## Quick Start
 
-| Language       | Directory            | Library            | Status |
-| :------------- | :------------------- | :----------------- | :----- |
-| **Python**     | [`python/`](python/) | `onnxruntime`      | Ready  |
-| **JavaScript** | [`js/`](js/)         | `onnxruntime-node` | Ready  |
-| **Go**         | [`go/`](go/)         | `onnxruntime_go`   | Ready  |
-| **Rust**       | [`rust/`](rust/)     | `ort`              | Ready  |
+### JavaScript
 
----
+```bash
+npm install monocr
+```
+
+```js
+const { read_image } = require("monocr");
+console.log(await read_image("doc.jpg"));
+```
 
 ### Python
 
-#### Installation
-
 ```bash
-cd python
-pip install .
+pip install monocr-onnx
 ```
-
-#### Usage
 
 ```python
-from monocr_onnx import MonOCR
-
-# Initialize
-ocr = MonOCR("../model/monocr.onnx", "../model/charset.txt")
-
-# Run Inference
-text = ocr.predict("path/to/image.jpg")
-print(f"Recognized: {text}")
+from monocr_onnx import read_image
+print(read_image("doc.jpg"))
 ```
-
----
-
-### JavaScript (Node.js)
-
-#### Installation
-
-```bash
-cd js
-npm install
-```
-
-#### Usage
-
-```javascript
-const MonOCR = require("./index");
-
-async function run() {
-  // Initialize
-  const ocr = new MonOCR("../model/monocr.onnx", "../model/charset.txt");
-
-  // Run Inference
-  const text = await ocr.predict("path/to/image.jpg");
-  console.log(`Recognized: ${text}`);
-}
-
-run();
-```
-
----
 
 ### Go
 
-#### Setup
-
 ```bash
-cd go
-go mod tidy
+go get github.com/janakh/monocr-onnx/go
 ```
-
-#### Usage
 
 ```go
-package main
-
-import (
-	"fmt"
-	"log"
-)
-
-func main() {
-	// Initialize
-	ocr, err := NewMonOCR("../model/monocr.onnx", "../model/charset.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Run Inference
-	text, err := ocr.Predict("path/to/image.jpg")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Printf("Recognized: %s\n", text)
-}
+text, _ := monocr.ReadImage("doc.jpg")
+fmt.Println(text)
 ```
 
----
+## Model Info
 
-### Rust
-
-#### Setup
-
-```bash
-cd rust
-cargo build --release
-```
-
-#### Usage
-
-```rust
-use std::path::Path;
-use anyhow::Result;
-
-fn main() -> Result<()> {
-    // Initialize
-    let ocr = MonOCR::new("../model/monocr.onnx", "../model/charset.txt")?;
-
-    // Run Inference
-    let text = ocr.predict(Path::new("path/to/image.jpg"))?;
-
-    println!("Recognized: {}", text);
-    Ok(())
-}
-```
-
-## Requirements
-
-- **ONNX Runtime**: Most bindings require the shared library or handle it automatically.
-- **Models**: Ensure `model/` is accessible relative to your execution path.
-- **Images**: Input images are automatically resized to height=64, preserving aspect ratio, converted to grayscale, and normalized.
+The model is hosted on HuggingFace: [janakh/monocr](https://huggingface.co/janakh/monocr).
+It is automatically cached to `~/.monocr/models/`.
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT

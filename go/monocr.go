@@ -1,168 +1,127 @@
-package main
+package monocr
 
 import (
+	_ "embed"
 	"fmt"
 	"image"
-	"image/color"
 	_ "image/jpeg"
-	_ "image/png"
-	"io/ioutil"
-	"log"
-	"math"
+	"image/png"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
-	"github.com/yalue/onnxruntime_go"
+	"github.com/janakh/monocr-onnx/go/pkg/model"
+	"github.com/janakh/monocr-onnx/go/pkg/predictor"
 )
 
-type MonOCR struct {
-	session *onnxruntime_go.DynamicAdvancedSession
-	charset string
-}
+//go:embed charset.txt
+var embeddedCharset string
 
-func NewMonOCR(modelPath, charsetPath string) (*MonOCR, error) {
-	// Initialize ONNX Runtime
-	onnxruntime_go.SetSharedLibraryPath("libonnxruntime.so") // This might need explicit path handling depending on OS
-	err := onnxruntime_go.InitializeEnvironment()
+// ReadImage recognizes text from an image file.
+// It automatically downloads the model if not present.
+func ReadImage(imagePath string) (string, error) {
+	manager, err := model.NewManager()
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize onnxruntime: %v", err)
+		return "", err
 	}
 
-	session, err := onnxruntime_go.NewDynamicAdvancedSession(
-		modelPath,
-		[]string{"input"},
-		[]string{"output"},
-		nil,
-	)
+	modelPath, err := manager.GetModelPath()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create session: %v", err)
+		return "", err
 	}
 
-	charsetBytes, err := ioutil.ReadFile(charsetPath)
+	return ReadImageWithModel(imagePath, modelPath, embeddedCharset)
+}
+
+// ReadImageWithModel allows specifying custom model and charset paths.
+func ReadImageWithModel(imagePath, modelPath, charset string) (string, error) {
+	pred, err := predictor.NewPredictor(modelPath, charset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read charset: %v", err)
+		return "", err
 	}
-	charset := string(charsetBytes)
+	defer pred.Close()
 
-	return &MonOCR{
-		session: session,
-		charset: charset,
-	}, nil
-}
-
-func (m *MonOCR) Preprocess(img image.Image) ([]float32, int64, int64) {
-	bounds := img.Bounds()
-	width := bounds.Dx()
-	height := bounds.Dy()
-
-	targetHeight := 64
-	aspectRatio := float64(width) / float64(height)
-	targetWidth := int(math.Round(float64(targetHeight) * aspectRatio))
-
-	// Resize and convert to grayscale manually or use library
-	// For simplicity, let's assume input is handling resizing or rely on basic Go image manipulation
-	// In a real package, use "golang.org/x/image/draw" for high-quality resizing.
-	
-	// Create tensor data (Simulated resize for structural correctness)
-	inputData := make([]float32, 1*1*targetHeight*targetWidth)
-	
-	for y := 0; y < targetHeight; y++ {
-		for x := 0; x < targetWidth; x++ {
-			// Nearest neighbor interpolation from original image (very naive)
-			srcX := int(float64(x) * float64(width) / float64(targetWidth))
-			srcY := int(float64(y) * float64(height) / float64(targetHeight))
-			
-			r, g, b, _ := img.At(srcX, srcY).RGBA()
-			// Convert to grayscale: 0.299*R + 0.587*G + 0.114*B
-			gray := 0.299*float64(r) + 0.587*float64(g) + 0.114*float64(b)
-			// Normalize to 0-1
-			inputData[y*targetWidth+x] = float32(gray / 65535.0) 
-		}
-	}
-	
-	return inputData, int64(targetHeight), int64(targetWidth)
-}
-
-func (m *MonOCR) Decode(preds []float32) string {
-	decodedText := ""
-	prevIdx := -1
-	
-	numClasses := len(m.charset) + 1
-	seqLen := len(preds) / numClasses
-	
-	for t := 0; t < seqLen; t++ {
-		maxVal := float32(-math.MaxFloat32)
-		maxIdx := 0
-		
-		for c := 0; c < numClasses; c++ {
-			val := preds[t*numClasses+c]
-			if val > maxVal {
-				maxVal = val
-				maxIdx = c
-			}
-		}
-		
-		if maxIdx != 0 && maxIdx != prevIdx {
-			// +1 because charset is 0-indexed string, but index 0 is blank
-			// In our charset string, char at index i corresponds to class i+1
-			if maxIdx-1 < len(m.charset) {
-				decodedText += string(m.charset[maxIdx-1])
-			}
-		}
-		prevIdx = maxIdx
-	}
-	
-	return decodedText
-}
-
-func (m *MonOCR) Predict(imagePath string) (string, error) {
 	f, err := os.Open(imagePath)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
-	
+
 	img, _, err := image.Decode(f)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to decode image: %v", err)
 	}
-	
-	inputData, h, w := m.Preprocess(img)
-	inputTensor, err := onnxruntime_go.NewTensor(inputData, []int64{1, 1, h, w})
-	if err != nil {
-		return "", err
-	}
-	defer inputTensor.Destroy()
-	
-	outputInfo, err := m.session.Run([]*onnxruntime_go.Tensor[float32]{inputTensor}, []string{"output"})
-	if err != nil {
-		return "", err
-	}
-	
-	// Assuming output[0] is the logits
-	outputTensor := outputInfo[0]
-	defer outputTensor.Destroy()
-	
-	preds := outputTensor.GetData()
-	return m.Decode(preds), nil
+
+	return pred.Predict(img)
 }
 
-func main() {
-	// Example usage
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: monocr <image_path>")
-		return
-	}
-	
-	ocr, err := NewMonOCR("../model/monocr.onnx", "../model/charset.txt")
+// ReadPDF recognizes text from a PDF file (requires pdftoppm/poppler-utils).
+func ReadPDF(pdfPath string) ([]string, error) {
+	// Check for pdftoppm
+	_, err := exec.LookPath("pdftoppm")
 	if err != nil {
-		log.Fatalf("Failed to init MonOCR: %v", err)
+		return nil, fmt.Errorf("pdftoppm not found: please install poppler-utils")
 	}
-	
-	text, err := ocr.Predict(os.Args[1])
+
+	manager, err := model.NewManager()
 	if err != nil {
-		log.Fatalf("Prediction failed: %v", err)
+		return nil, err
 	}
-	
-	fmt.Printf("OCR Result: %s\n", text)
+
+	modelPath, err := manager.GetModelPath()
+	if err != nil {
+		return nil, err
+	}
+
+	// Create temp dir
+	tempDir, err := os.MkdirTemp("", "monocr-go-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Convert PDF to images
+	cmd := exec.Command("pdftoppm", "-png", "-r", "300", pdfPath, filepath.Join(tempDir, "page"))
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("failed to convert PDF: %v", err)
+	}
+
+	// Read all generated images
+	files, err := os.ReadDir(tempDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []string
+	pred, err := predictor.NewPredictor(modelPath, embeddedCharset)
+	if err != nil {
+		return nil, err
+	}
+	defer pred.Close()
+
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".png") {
+			imgPath := filepath.Join(tempDir, file.Name())
+			
+			f, err := os.Open(imgPath)
+			if err != nil {
+				continue
+			}
+			
+			img, err := png.Decode(f)
+			f.Close()
+			if err != nil {
+				continue
+			}
+
+			text, err := pred.Predict(img)
+			if err != nil {
+				continue
+			}
+			results = append(results, text)
+		}
+	}
+
+	return results, nil
 }
