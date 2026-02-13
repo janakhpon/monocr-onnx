@@ -1,0 +1,23 @@
+[package]
+name = "monocr-onnx"
+version = "0.1.0"
+edition = "2021"
+description = "Cross-platform Mon (mnw) language OCR using ONNX Runtime. Efficient and robust."
+license = "MIT"
+repository = "https://github.com/janakh/monocr-onnx"
+readme = "README.md"
+keywords = ["ocr", "mon", "mnw", "onnx", "ml"]
+categories = ["science", "multimedia::images"]
+exclude = [
+    "model/*",
+    "tests/*",
+    "examples/*",
+    ".gitignore",
+    ".github/*",
+]
+
+[dependencies]
+ort = "1.16.0"
+ndarray = "0.15.6"
+image = "0.24.7"
+anyhow = "1.0.75"
