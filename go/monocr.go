@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"image"
 	_ "image/jpeg"
-	"image/png"
+	_ "image/png"
 	"os"
 	"os/exec"
 	"path/filepath"

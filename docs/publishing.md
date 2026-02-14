@@ -1,127 +1,128 @@
-# Publishing Guide (MonOCR-ONNX)
+# MonOCR Release Runbook
 
-This guide documents the modern, secure publishing workflows for the MonOCR-ONNX multi-language SDKs.
+> **Context**: We use a manual release process. Automation is great, but for this stage of the project, we want full control over exactly what bits assume the `latest` tag.
+>
+> **Golden Rule**: If it's not in `main`, it doesn't exist. If it's not tested, it's broken.
 
-## 🛡️ Modern Best Practices
+## Pre-Flight Checks
 
-We prioritize **Trusted Publishing** (OIDC) to eliminate the need for long-lived tokens/passwords in GitHub Secrets.
+Before you even think about publishing, verify your environment matches our constraints.
 
-### 1. Python (PyPI)
-
-We use `uv` for building and **Trusted Publishing** for security.
-
-#### Configuration
-
-- Register the project on PyPI under the name `monocr-onnx`.
-- Set up **Trusted Publishing** on PyPI:
-  - **Publisher**: GitHub Actions
-  - **Owner**: `MonDevHub`
-  - **Repository**: `monocr-onnx`
-  - **Workflow name**: `release-python.yml`
-
-#### Workflow (`.github/workflows/release-python.yml`)
-
-```yaml
-name: Release Python
-on:
-  push:
-    tags: ["python-v*"]
-permissions:
-  id-token: write
-  contents: read
-jobs:
-  publish:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-      - name: Build and Publish
-        run: |
-          cd python
-          uv build
-          uv publish --trusted-publishing always
-```
-
-### 2. JavaScript (npm)
-
-We use **OIDC** and **Provenance** for verified builds.
-
-#### Configuration
-
-- On npmjs.com, configure the `monocr` package to use **GitHub Actions** as a trusted publisher.
-- Ensure `package.json` has `repository` and `homepage` pointing to the correct GitHub URL.
-
-#### Workflow (`.github/workflows/release-js.yml`)
-
-```yaml
-name: Release JS
-on:
-  push:
-    tags: ["js-v*"]
-permissions:
-  id-token: write
-  contents: read
-jobs:
-  publish:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          registry-url: "https://registry.npmjs.org"
-      - run: |
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 8
-      - run: |
-          cd js
-          pnpm install
-          pnpm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-```
-
-Note: npm is currently rolling out Trusted Publishing. If not yet available for your account, use a granular access token.
-
-### 3. Go
-
-Go "publishing" is simply git tagging.
-
-1. Ensure `go/go.mod` module path is correct.
-2. Tag the repository: `git tag go/v0.x.y`.
-3. Push the tag: `git push origin go/v0.x.y`.
-
-Users can then `go get github.com/MonDevHub/monocr-onnx/go@v0.x.y`.
+| Runtime     | Requirement     | Check Commmand     |
+| :---------- | :-------------- | :----------------- |
+| **Python**  | `3.11` (Strict) | `python --version` |
+| **Node.js** | `20+`           | `node -v`          |
+| **pnpm**    | `9+` (Strict)   | `pnpm -v`          |
+| **Go**      | `1.23+`         | `go version`       |
 
 ---
 
-## 🏗️ Local Development / Manual Release
+## Python (`monocr-onnx`)
 
-If manual publishing is required:
+We use `uv` because it's fast and correct. Don't use `setup.py`.
 
-### Python
+### 1. Build & verify
+
+Clean slate first. We don't want stale artifacts.
 
 ```bash
 cd python
 rm -rf dist/
-pip install uv
 uv build
+```
+
+### 2. Smoke Test
+
+Install the wheel we just built in a fresh venv to ensure we didn't miss a file in `include`.
+
+```bash
+uv venv .test-venv
+source .test-venv/bin/activate
+uv pip install dist/*.whl
+python -c "import monocr_onnx; print(monocr_onnx.__version__)"
+deactivate
+rm -rf .test-venv
+```
+
+_(If that failed, fix your `pyproject.toml`)_
+
+### 3. Ship it
+
+```bash
 uv publish
 ```
 
-### JS
+---
+
+## JavaScript (`monocr`)
+
+We use `pnpm`. It enforces strict dependency boundaries which saves us from "it works on my machine" phantom dependency issues.
+
+### 1. Hard Reset
+
+Ensure dependencies are exactly what the lockfile says.
 
 ```bash
 cd js
-pnpm login
+pnpm install --frozen-lockfile
+pnpm approve-builds # Build binaries (sharp, onnxruntime)
+```
+
+### 2. Verify
+
+Run the batch example. It's our de-facto integration test.
+
+```bash
+node ../examples/js/batch-example.js
+```
+
+### 3. Version & Release
+
+**Crucial**: `pnpm publish` checks for a clean git state. Commit your version bump _before_ running this.
+
+```bash
+pnpm version patch # or minor
+git commit -am "chore(js): bump version"
 pnpm publish --access public
 ```
 
-### Go
+---
+
+## Go (`github.com/MonDevHub/monocr-onnx/go`)
+
+Go modules are just git tags. But we have a mono-repo, so tags are namespaced.
+
+### 1. Tidy Up
+
+Never ship a `go.mod` that hasn't been tidied.
 
 ```bash
 cd go
 go mod tidy
-# commit and push
+go test -v ./...
 ```
+
+### 2. Tag It
+
+The tag **must** look like `go/vX.Y.Z`. If you tag it `vX.Y.Z`, Go won't find the module in the subdirectory.
+
+```bash
+# assuming you're in root
+git tag go/v0.1.1
+git push origin go/v0.1.1
+```
+
+### 3. Verify
+
+Ask the proxy to index it immediately.
+
+```bash
+GOPROXY=proxy.golang.org go list -m github.com/MonDevHub/monocr-onnx/go@v0.1.1
+```
+
+---
+
+## 🪄 Final Steps
+
+1.  **Bump local versions**: Ensure `task.md` or internal docs reflect the new numbers.
+2.  **Changelog**: If you didn't write a changelog, did the release really happen? (Update `CHANGELOG.md` if we have one, or release notes on GitHub).

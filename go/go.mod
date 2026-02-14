@@ -1,11 +1,11 @@
 module github.com/MonDevHub/monocr-onnx/go
 
-go 1.24.0
+go 1.23
 
 require (
 	github.com/spf13/cobra v1.10.2
 	github.com/yalue/onnxruntime_go v1.11.0
-	golang.org/x/image v0.36.0
+	golang.org/x/image v0.18.0
 )
 
 require (
