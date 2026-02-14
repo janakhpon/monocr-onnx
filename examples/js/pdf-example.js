@@ -9,7 +9,7 @@ async function main() {
     console.log('MonOCR PDF Example (using published npm package)\n');
     
     // Test PDF (provide your own PDF path)
-    const pdfPath = process.argv[2] || join(__dirname, '../../data/pdfs/Mon_E_library.pdf');
+    const pdfPath = process.argv[2] || join(__dirname, '../../data/pdfs/party_mission.pdf');
     
     console.log('Reading PDF:', pdfPath);
     console.log('Model: Auto-downloading/cached');

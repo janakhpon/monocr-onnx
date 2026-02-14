@@ -33,9 +33,13 @@ npm run accuracy   # Accuracy benchmark
 
 ```bash
 cd python
-python simple.py    # Basic usage
-python pdf.py       # PDF usage
-python accuracy.py  # Accuracy check
+# Setup environment (optional, uv run will auto-setup)
+uv sync
+
+# Run examples
+uv run python simple.py    # Basic usage
+uv run python pdf.py       # PDF usage
+uv run python accuracy.py  # Accuracy check
 ```
 
 ### Go

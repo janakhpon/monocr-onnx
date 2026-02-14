@@ -52,36 +52,55 @@ async function read_images(imagePaths, modelPath = null, charsetPath = null) {
  * @returns {Promise<string[]>} Array of text per page
  */
 async function read_pdf(pdfPath, modelPath = null, charsetPath = null) {
-    const pdfImgConvert = require('pdf-img-convert');
-    const path = require('path');
     const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execPromise = util.promisify(exec);
     
+    // Check for pdftoppm
+    try {
+        await execPromise('pdftoppm -v');
+    } catch (e) {
+        throw new Error('pdftoppm not found: please install poppler-utils (brew install poppler on macOS, or sudo apt install poppler-utils on Linux)');
+    }
+
     // Initialize OCR
     const ocr = new MonOCR(modelPath, charsetPath);
     await ocr.init();
     
+    // Create temp directory
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'monocr-js-'));
+    
     try {
-        // Convert PDF to image buffers (returns Uint8Array[])
-        // pdf-img-convert handles parsing internally using pdf.js
-        const imageBuffers = await pdfImgConvert.convert(pdfPath, {
-            width: 2480,  // High resolution for OCR
-            height: 3508,
-            page_numbers: [] // All pages
+        // Convert PDF to images using pdftoppm
+        // pdftoppm -png -r 300 input.pdf output_prefix
+        const outputPrefix = path.join(tempDir, 'page');
+        await execPromise(`pdftoppm -png -r 300 "${pdfPath}" "${outputPrefix}"`);
+
+        // Read generated images
+        const files = fs.readdirSync(tempDir).sort(); // Sort to ensure page order? pdftoppm uses -1, -2 etc.
+        // Actually pdftoppm numbers are zero-padded usually? No, "page-1.png", "page-10.png" might sort wrong alphabetically.
+        // pdftoppm output format: prefix-1.png, prefix-2.png ...
+        // We should sort naturally.
+        
+        const imageFiles = files.filter(f => f.endsWith('.png')).sort((a, b) => {
+             // Extract numbers
+             const numA = parseInt(a.match(/-(\d+)\.png$/)[1]);
+             const numB = parseInt(b.match(/-(\d+)\.png$/)[1]);
+             return numA - numB;
         });
 
-        if (!imageBuffers || imageBuffers.length === 0) {
+        if (imageFiles.length === 0) {
             throw new Error("Failed to convert PDF: No images generated");
         }
 
         const pages = [];
         
-        for (let i = 0; i < imageBuffers.length; i++) {
-            // pdf-img-convert returns Uint8Array (buffer-like)
-            // MonOCR's predictPage expects a file path or sharp-compatible input
-            // sharp can take a Buffer.
-            const buffer = Buffer.from(imageBuffers[i]);
-            
-            const results = await ocr.predictPage(buffer);
+        for (const file of imageFiles) {
+            const imgPath = path.join(tempDir, file);
+            const results = await ocr.predictPage(imgPath);
             const pageText = results.map(r => r.text).join('\n');
             pages.push(pageText);
         }
@@ -89,6 +108,13 @@ async function read_pdf(pdfPath, modelPath = null, charsetPath = null) {
         return pages;
     } catch (err) {
         throw new Error(`Failed to process PDF: ${err.message}`);
+    } finally {
+        // Cleanup
+        try {
+            fs.rmSync(tempDir, { recursive: true, force: true });
+        } catch (e) {
+            // ignore cleanup error
+        }
     }
 }
 

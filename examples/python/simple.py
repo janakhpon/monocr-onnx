@@ -10,6 +10,4 @@ print(f"Reading image: {image_path}")
 text = read_image(image_path)
 
 print("Recognized Text:")
-print("================")
 print(text)
-print("================")

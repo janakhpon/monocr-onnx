@@ -1,0 +1,19 @@
+[project]
+name = "python"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "janakhpon", email = "jnovaxer@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "monocr-onnx",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+monocr-onnx = { path = "../../python" }
