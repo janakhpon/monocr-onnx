@@ -1,4 +1,4 @@
-module github.com/janakh/monocr-onnx/go
+module github.com/MonDevHub/monocr-onnx/go
 
 go 1.24.0
 

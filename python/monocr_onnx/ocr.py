@@ -19,6 +19,28 @@ def read_image(image_path, model_path=None, charset_path=None):
     ocr = MonOCR(model_path, charset_path)
     return ocr.predict(image_path)
 
+from concurrent.futures import ThreadPoolExecutor
+
+def read_images(image_paths, model_path=None, charset_path=None, workers=4):
+    """
+    Recognize text from multiple image files in parallel.
+    
+    Args:
+        image_paths (list[str or Path]): List of paths to image files.
+        model_path (str, optional): Path to model.
+        charset_path (str, optional): Path to charset.
+        workers (int, optional): Number of parallel workers. Defaults to 4.
+        
+    Returns:
+        list[str]: List of recognized text for each image.
+    """
+    ocr = MonOCR(model_path, charset_path)
+    
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        results = list(executor.map(ocr.predict, image_paths))
+        
+    return results
+
 def read_pdf(pdf_path, model_path=None, charset_path=None):
     """
     Recognize text from a PDF file.
@@ -37,11 +59,29 @@ def read_pdf(pdf_path, model_path=None, charset_path=None):
         raise RuntimeError(f"Failed to convert PDF. Ensure poppler-utils is installed. Error: {e}")
     
     ocr = MonOCR(model_path, charset_path)
-    results = []
+    # Process pages sequentially as they are in memory
+    results = [ocr.predict(img) for img in images]
+        
+    return results
+
+def read_pdfs(pdf_paths, model_path=None, charset_path=None, workers=4):
+    """
+    Recognize text from multiple PDF files.
     
-    for img in images:
-        text = ocr.predict(img)
-        results.append(text)
+    Args:
+        pdf_paths (list[str or Path]): List of paths to PDF files.
+        model_path (str, optional): Path to model.
+        charset_path (str, optional): Path to charset.
+        workers (int, optional): Workers for parallelism.
+        
+    Returns:
+        list[list[str]]: List of lists of recognized text per page for each PDF.
+    """
+    def process_single_pdf(path):
+        return read_pdf(path, model_path, charset_path)
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        results = list(executor.map(process_single_pdf, pdf_paths))
         
     return results
 

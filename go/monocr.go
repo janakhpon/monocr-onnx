@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/janakh/monocr-onnx/go/pkg/model"
-	"github.com/janakh/monocr-onnx/go/pkg/predictor"
+	"github.com/MonDevHub/monocr-onnx/go/pkg/model"
+	"github.com/MonDevHub/monocr-onnx/go/pkg/predictor"
 )
 
 //go:embed charset.txt
@@ -34,6 +34,45 @@ func ReadImage(imagePath string) (string, error) {
 	return ReadImageWithModel(imagePath, modelPath, embeddedCharset)
 }
 
+// ReadImages recognizes text from multiple image files.
+func ReadImages(imagePaths []string) ([]string, error) {
+	manager, err := model.NewManager()
+	if err != nil {
+		return nil, err
+	}
+
+	modelPath, err := manager.GetModelPath()
+	if err != nil {
+		return nil, err
+	}
+
+	pred, err := predictor.NewPredictor(modelPath, embeddedCharset)
+	if err != nil {
+		return nil, err
+	}
+	defer pred.Close()
+
+	var results []string
+	for _, path := range imagePaths {
+		text, err := predictFile(pred, path)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, text)
+	}
+	return results, nil
+}
+
+// ReadImageWithAccuracy recognizes text and calculates accuracy against ground truth.
+func ReadImageWithAccuracy(imagePath, groundTruth string) (string, float64, error) {
+	text, err := ReadImage(imagePath)
+	if err != nil {
+		return "", 0, err
+	}
+	accuracy := calculateAccuracy(text, groundTruth)
+	return text, accuracy, nil
+}
+
 // ReadImageWithModel allows specifying custom model and charset paths.
 func ReadImageWithModel(imagePath, modelPath, charset string) (string, error) {
 	pred, err := predictor.NewPredictor(modelPath, charset)
@@ -42,6 +81,10 @@ func ReadImageWithModel(imagePath, modelPath, charset string) (string, error) {
 	}
 	defer pred.Close()
 
+	return predictFile(pred, imagePath)
+}
+
+func predictFile(pred *predictor.Predictor, imagePath string) (string, error) {
 	f, err := os.Open(imagePath)
 	if err != nil {
 		return "", err
@@ -74,6 +117,39 @@ func ReadPDF(pdfPath string) ([]string, error) {
 		return nil, err
 	}
 
+	return readPDFWithModel(pdfPath, modelPath, embeddedCharset)
+}
+
+// ReadPDFs recognizes text from multiple PDF files.
+func ReadPDFs(pdfPaths []string) ([][]string, error) {
+	// Check for pdftoppm
+	_, err := exec.LookPath("pdftoppm")
+	if err != nil {
+		return nil, fmt.Errorf("pdftoppm not found: please install poppler-utils")
+	}
+
+	manager, err := model.NewManager()
+	if err != nil {
+		return nil, err
+	}
+
+	modelPath, err := manager.GetModelPath()
+	if err != nil {
+		return nil, err
+	}
+
+	var results [][]string
+	for _, path := range pdfPaths {
+		pages, err := readPDFWithModel(path, modelPath, embeddedCharset)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, pages)
+	}
+	return results, nil
+}
+
+func readPDFWithModel(pdfPath, modelPath, charset string) ([]string, error) {
 	// Create temp dir
 	tempDir, err := os.MkdirTemp("", "monocr-go-")
 	if err != nil {
@@ -93,29 +169,17 @@ func ReadPDF(pdfPath string) ([]string, error) {
 		return nil, err
 	}
 
-	var results []string
-	pred, err := predictor.NewPredictor(modelPath, embeddedCharset)
+	pred, err := predictor.NewPredictor(modelPath, charset)
 	if err != nil {
 		return nil, err
 	}
 	defer pred.Close()
 
+	var results []string
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".png") {
 			imgPath := filepath.Join(tempDir, file.Name())
-			
-			f, err := os.Open(imgPath)
-			if err != nil {
-				continue
-			}
-			
-			img, err := png.Decode(f)
-			f.Close()
-			if err != nil {
-				continue
-			}
-
-			text, err := pred.Predict(img)
+			text, err := predictFile(pred, imgPath)
 			if err != nil {
 				continue
 			}
@@ -124,4 +188,60 @@ func ReadPDF(pdfPath string) ([]string, error) {
 	}
 
 	return results, nil
+}
+
+// Levenshtein distance calculation
+func levenshtein(s1, s2 []rune) int {
+	len1, len2 := len(s1), len(s2)
+	column := make([]int, len1+1)
+
+	for y := 1; y <= len1; y++ {
+		column[y] = y
+	}
+
+	for x := 1; x <= len2; x++ {
+		column[0] = x
+		lastDiag := x - 1
+		for y := 1; y <= len1; y++ {
+			oldDiag := column[y]
+			cost := 0
+			if s1[y-1] != s2[x-1] {
+				cost = 1
+			}
+			column[y] = min(column[y]+1, min(column[y-1]+1, lastDiag+cost))
+			lastDiag = oldDiag
+		}
+	}
+	return column[len1]
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func calculateAccuracy(pred, truth string) float64 {
+	p := []rune(pred)
+	t := []rune(truth)
+	
+	if len(t) == 0 {
+		if len(p) == 0 {
+			return 100.0
+		}
+		return 0.0
+	}
+	
+	dist := levenshtein(p, t)
+	maxLen := len(p)
+	if len(t) > maxLen {
+		maxLen = len(t)
+	}
+	
+	if maxLen == 0 {
+		return 100.0
+	}
+	
+	return (1.0 - float64(dist)/float64(maxLen)) * 100.0
 }

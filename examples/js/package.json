@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "image": "node image-example.js",
-    "pdf": "node pdf-example.js"
+    "pdf": "node pdf-example.js",
+    "batch": "node batch-example.js",
+    "accuracy": "node accuracy-example.js"
   },
   "dependencies": {
     "monocr": "^0.1.3",

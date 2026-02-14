@@ -1,90 +1,127 @@
-# MonOCR-ONNX Publishing Setup Plan
+# Publishing Guide (MonOCR-ONNX)
 
-## Goal
+This guide documents the modern, secure publishing workflows for the MonOCR-ONNX multi-language SDKs.
 
-Set up professional, automated build and publishing pipelines for the `monocr-onnx` multi-language package.
+## 🛡️ Modern Best Practices
 
-## Strategy
+We prioritize **Trusted Publishing** (OIDC) to eliminate the need for long-lived tokens/passwords in GitHub Secrets.
 
-We will use **GitHub Actions** for CI/CD and **automated versioning**. Each language binding will have its own build configuration and publishing step.
+### 1. Python (PyPI)
 
-### 1. Repository Configuration
+We use `uv` for building and **Trusted Publishing** for security.
 
-- **`.gitignore`**: Ensure `model/` is ignored generally, but we need a strategy for distributing the model.
-  - _Decision_: We will **NOT bundle** the model in the packages (due to size limits: npm ~unlimited but bad practice, PyPI ~60MB limit, Crates.io 10MB limit).
-  - _Solution_: The packages will require the user to provide the model path (current API design) OR download it separately. We will add a `download_model` script/CLI to each package.
+#### Configuration
 
-### 2. Package Configuration Updates
+- Register the project on PyPI under the name `monocr-onnx`.
+- Set up **Trusted Publishing** on PyPI:
+  - **Publisher**: GitHub Actions
+  - **Owner**: `MonDevHub`
+  - **Repository**: `monocr-onnx`
+  - **Workflow name**: `release-python.yml`
 
-#### JavaScript (npm)
+#### Workflow (`.github/workflows/release-python.yml`)
 
-- **`js/package.json`**:
-  - Add `repository`, `homepage`, `bugs`.
-  - Add `files`: `["index.js", "README.md", "LICENSE"]`.
-  - Add `scripts`: `prepublishOnly` (test).
-  - Add `bin`: `monocr-download` script?
+```yaml
+name: Release Python
+on:
+  push:
+    tags: ["python-v*"]
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Build and Publish
+        run: |
+          cd python
+          uv build
+          uv publish --trusted-publishing always
+```
 
-#### Python (PyPI)
+### 2. JavaScript (npm)
 
-- **`python/pyproject.toml`**:
-  - Add `project.urls`.
-  - Add `classifiers`.
-  - Add `cli` for downloading model if needed.
+We use **OIDC** and **Provenance** for verified builds.
 
-#### Rust (crates.io)
+#### Configuration
 
-- **`rust/Cargo.toml`**:
-  - Add `repository`, `license`, `description`, `keywords`.
-  - Exclude `model/` from package via `exclude` or `include`.
+- On npmjs.com, configure the `monocr` package to use **GitHub Actions** as a trusted publisher.
+- Ensure `package.json` has `repository` and `homepage` pointing to the correct GitHub URL.
 
-#### Go
+#### Workflow (`.github/workflows/release-js.yml`)
 
-- Ensure `go.mod` module path is `github.com/janakh/monocr-onnx/go` (or root).
-- Go publishing is just Git tagging.
+```yaml
+name: Release JS
+on:
+  push:
+    tags: ["js-v*"]
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+      - run: |
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - run: |
+          cd js
+          pnpm install
+          pnpm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+```
 
-### 3. Build & Publish Automation (GitHub Actions)
+Note: npm is currently rolling out Trusted Publishing. If not yet available for your account, use a granular access token.
 
-Create `.github/workflows/main.yml` (CI) and `.github/workflows/release.yml` (CD).
+### 3. Go
 
-#### CI Workflow (Pull Requests)
+Go "publishing" is simply git tagging.
 
-- **JS**: `npm ci` && `npm test`
-- **Python**: `pip install .` && `pytest`
-- **Rust**: `cargo test`
-- **Go**: `go test ./...`
+1. Ensure `go/go.mod` module path is correct.
+2. Tag the repository: `git tag go/v0.x.y`.
+3. Push the tag: `git push origin go/v0.x.y`.
 
-#### Release Workflow (Tags `v*`)
+Users can then `go get github.com/MonDevHub/monocr-onnx/go@v0.x.y`.
 
-1. **Prepare**: Extract version from tag.
-2. **Publish JS**:
-   - `npm publish --access public` (requires `NPM_TOKEN`)
-3. **Publish Python**:
-   - Build wheel/sdist.
-   - `twine upload` (requires `PYPI_TOKEN`).
-4. **Publish Rust**:
-   - `cargo publish` (requires `CARGO_REGISTRY_TOKEN`).
-5. **Publish Go**:
-   - Just creates a GitHub Release with artifacts (if binaries) or just exists.
+---
 
-### 4. Code Changes Required
+## 🏗️ Local Development / Manual Release
 
-- **JS**: Add `.npmignore` (ignore `model/`).
-- **Python**: Ensure `MANIFEST.in` excludes `model/`.
-- **Rust**: Update `Cargo.toml` exclude.
-- **Go**: No changes needed if just source.
+If manual publishing is required:
 
-## Implementation Steps
+### Python
 
-1.  **Update Configs**: Modify `package.json`, `pyproject.toml`, `Cargo.toml`.
-2.  **Ignore Files**: Create `.npmignore`, `MANIFEST.in`.
-3.  **CI/CD**: Create `.github/workflows/` files.
-4.  **Documentation**: Update `README.md` with "How to Release" section (for maintainers).
+```bash
+cd python
+rm -rf dist/
+pip install uv
+uv build
+uv publish
+```
 
-## Senior Engineer Details
+### JS
 
-- **Idempotency**: Workflows should fail gracefully if version exists.
-- **Security**: Use OIDC for PyPI (if possible) or Secrets.
-- **Provenance**: Enable npm provenance.
-- **Verification**: checksums for downloaded models (future).
+```bash
+cd js
+pnpm login
+pnpm publish --access public
+```
 
-Let's start by updating the package configurations.
+### Go
+
+```bash
+cd go
+go mod tidy
+# commit and push
+```

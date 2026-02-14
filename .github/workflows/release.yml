@@ -1,69 +1,23 @@
-name: Release
+name: release
 
 on:
   push:
     tags:
       - "v*"
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
-  publish-npm:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          registry-url: "https://registry.npmjs.org"
+      - uses: astral-sh/setup-uv@v4
       - run: |
-          cd js
-          npm ci
-          npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  publish-pypi:
-    runs-on: ubuntu-latest
-    environment: release
-    permissions:
-      id-token: write # Mandatory for trusted publishers
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Build and publish
-        run: |
           cd python
-          pip install build twine
-          python -m build
-          # Recommended: Use Trusted Publishers (OIDC) instead of tokens
-          # If using tokens:
-          # twine upload dist/*
-          # if using oidc:
-        # uses: pypa/gh-action-pypi-publish@release/v1
-        # with:
-        #   packages-dir: python/dist/
-
-  publish-crates:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+          uv build --no-sources
       - run: |
-          cd rust
-          cargo publish --token ${CRATES_IO_TOKEN}
-        env:
-          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-
-  github-release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          generate_release_notes: true
-          draft: false
-          prerelease: false
+          cd python
+          uv publish --trusted-publishing always

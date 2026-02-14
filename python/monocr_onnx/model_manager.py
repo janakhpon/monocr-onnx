@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 class ModelManager:
     MODEL_FILENAME = "monocr.onnx"
-    MODEL_URL = "https://huggingface.co/janakh/monocr/resolve/main/monocr.onnx"
+    MODEL_URL = "https://huggingface.co/janakhpon/monocr/resolve/main/onnx/monocr.onnx"
     
     def __init__(self):
         self.cache_dir = Path.home() / ".monocr" / "models"

@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/janakh/monocr-onnx/go"
-	"github.com/janakh/monocr-onnx/go/pkg/model"
+	"github.com/MonDevHub/monocr-onnx/go"
+	"github.com/MonDevHub/monocr-onnx/go/pkg/model"
 	"github.com/spf13/cobra"
 )
 

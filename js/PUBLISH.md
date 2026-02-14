@@ -1,62 +1,66 @@
-# Publishing monocr-onnx to npm
+# Publishing MonOCR (JS) with pnpm
 
-Quick reference for publishing new versions.
+Quick reference for publishing new versions using `pnpm`.
 
-## Quick Steps
+## Prerequisites
 
-1. **Ensure everything works**
+- **Install**: `npm install -g pnpm`
+- **Login**: `pnpm login`
+
+## Steps
+
+1. **Verify State**
 
    ```bash
-   npm install
-   node examples/simple.js
+   pnpm install
+   pnpm approve-builds  # Important for sharp/canvas binaries
+   # Run tests if available
    ```
 
-2. **Bump version**
+2. **Commit Changes**
+
+   pnpm requires a clean git working tree by default.
 
    ```bash
-   npm version patch   # 0.1.0 -> 0.1.1
-   npm version minor   # 0.1.0 -> 0.2.0
-   npm version major   # 0.1.0 -> 1.0.0
+   git add .
+   git commit -m "chore: release prep"
    ```
 
-3. **Dry run**
+3. **Bump Version**
 
    ```bash
-   npm publish --dry-run
+   pnpm version patch   # 0.1.0 -> 0.1.1
+   # or
+   pnpm version minor   # 0.1.0 -> 0.2.0
    ```
 
 4. **Publish**
 
    ```bash
-   npm publish --access public
+   pnpm publish --access public
    ```
 
-5. **Push to GitHub**
+   _Tip: If you must publish with uncommitted changes (not recommended), use `--no-git-checks`._
+
+5. **Push Tags**
+
    ```bash
    git push origin main --tags
    ```
 
-## First Time Setup
+## Files
 
-```bash
-# Login to npm
-npm login
+Run `pnpm pack` to see exactly what will be uploaded (tarball).
+It should include:
 
-# Verify
-npm whoami
-```
+- `src/`
+- `bin/`
+- `README.md`
+- `LICENSE`
+- `package.json`
 
-## Files Included
+(Model files are excluded).
 
-The package.json `files` field controls what gets published:
+## Full Guide
 
-- `src/` - All source code
-- `bin/` - CLI tools
-- `README.md` - Documentation
-- `LICENSE` - License file
-
-Model files are excluded (too large for npm).
-
-## See Full Guide
-
-For detailed instructions, see [PUBLISHING.md](PUBLISHING.md)
+See [docs/publishing.md](../docs/publishing.md) for complete details on all SDKs.
