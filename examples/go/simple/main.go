@@ -13,7 +13,7 @@ func main() {
 	// Get path to test image
 	_, filename, _, _ := runtime.Caller(0)
 	projectRoot := filepath.Join(filepath.Dir(filename), "../../..")
-	imagePath := filepath.Join(projectRoot, "data/images/test_0005.jpg")
+	imagePath := filepath.Join(projectRoot, "data/images/test_0005_h71.png")
 
 	fmt.Printf("Reading image: %s\n", imagePath)
 	fmt.Println("Model: Auto-downloading/cached")

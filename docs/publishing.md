@@ -1,90 +1,121 @@
-# MonOCR-ONNX Publishing Setup Plan
+# MonOCR Release Runbook
 
-## Goal
+> **Context**: We use a manual release process. Automation is great, but for this stage of the project, we want full control over exactly what bits assume the `latest` tag.
+>
+> **Golden Rule**: If it's not in `main`, it doesn't exist. If it's not tested, it's broken.
 
-Set up professional, automated build and publishing pipelines for the `monocr-onnx` multi-language package.
+## Pre-Flight Checks
 
-## Strategy
+Before you even think about publishing, verify your environment matches our constraints.
 
-We will use **GitHub Actions** for CI/CD and **automated versioning**. Each language binding will have its own build configuration and publishing step.
+| Runtime     | Requirement     | Check Commmand     |
+| :---------- | :-------------- | :----------------- |
+| **Python**  | `3.11` (Strict) | `python --version` |
+| **Node.js** | `20+`           | `node -v`          |
+| **pnpm**    | `9+` (Strict)   | `pnpm -v`          |
+| **Go**      | `1.23+`         | `go version`       |
 
-### 1. Repository Configuration
+---
 
-- **`.gitignore`**: Ensure `model/` is ignored generally, but we need a strategy for distributing the model.
-  - _Decision_: We will **NOT bundle** the model in the packages (due to size limits: npm ~unlimited but bad practice, PyPI ~60MB limit, Crates.io 10MB limit).
-  - _Solution_: The packages will require the user to provide the model path (current API design) OR download it separately. We will add a `download_model` script/CLI to each package.
+## Python (`monocr-onnx`)
 
-### 2. Package Configuration Updates
+We use `uv` because it's fast and correct. Don't use `setup.py`.
 
-#### JavaScript (npm)
+### 1. Build & verify
 
-- **`js/package.json`**:
-  - Add `repository`, `homepage`, `bugs`.
-  - Add `files`: `["index.js", "README.md", "LICENSE"]`.
-  - Add `scripts`: `prepublishOnly` (test).
-  - Add `bin`: `monocr-download` script?
+Clean slate first. We don't want stale artifacts.
 
-#### Python (PyPI)
+```bash
+cd python
+rm -rf dist/
+uv build
+```
 
-- **`python/pyproject.toml`**:
-  - Add `project.urls`.
-  - Add `classifiers`.
-  - Add `cli` for downloading model if needed.
+### 2. Smoke Test
 
-#### Rust (crates.io)
+Install the wheel we just built in a fresh venv to ensure we didn't miss a file in `include`.
 
-- **`rust/Cargo.toml`**:
-  - Add `repository`, `license`, `description`, `keywords`.
-  - Exclude `model/` from package via `exclude` or `include`.
+```bash
+uv venv .test-venv
+source .test-venv/bin/activate
+uv pip install dist/*.whl
+python -c "import monocr_onnx; print(monocr_onnx.__version__)"
+deactivate
+rm -rf .test-venv
+```
 
-#### Go
+_(If that failed, fix your `pyproject.toml`)_
 
-- Ensure `go.mod` module path is `github.com/janakh/monocr-onnx/go` (or root).
-- Go publishing is just Git tagging.
+### 3. Ship it
 
-### 3. Build & Publish Automation (GitHub Actions)
+```bash
+uv publish
+```
 
-Create `.github/workflows/main.yml` (CI) and `.github/workflows/release.yml` (CD).
+---
 
-#### CI Workflow (Pull Requests)
+## JavaScript (`monocr`)
 
-- **JS**: `npm ci` && `npm test`
-- **Python**: `pip install .` && `pytest`
-- **Rust**: `cargo test`
-- **Go**: `go test ./...`
+We use `pnpm`. It enforces strict dependency boundaries which saves us from "it works on my machine" phantom dependency issues.
 
-#### Release Workflow (Tags `v*`)
+### 1. Hard Reset
 
-1. **Prepare**: Extract version from tag.
-2. **Publish JS**:
-   - `npm publish --access public` (requires `NPM_TOKEN`)
-3. **Publish Python**:
-   - Build wheel/sdist.
-   - `twine upload` (requires `PYPI_TOKEN`).
-4. **Publish Rust**:
-   - `cargo publish` (requires `CARGO_REGISTRY_TOKEN`).
-5. **Publish Go**:
-   - Just creates a GitHub Release with artifacts (if binaries) or just exists.
+Ensure dependencies are exactly what the lockfile says.
 
-### 4. Code Changes Required
+```bash
+cd js
+pnpm install --frozen-lockfile
+pnpm approve-builds # Build binaries (sharp, onnxruntime)
+```
 
-- **JS**: Add `.npmignore` (ignore `model/`).
-- **Python**: Ensure `MANIFEST.in` excludes `model/`.
-- **Rust**: Update `Cargo.toml` exclude.
-- **Go**: No changes needed if just source.
+### 2. Verify
 
-## Implementation Steps
+Run the batch example. It's our de-facto integration test.
 
-1.  **Update Configs**: Modify `package.json`, `pyproject.toml`, `Cargo.toml`.
-2.  **Ignore Files**: Create `.npmignore`, `MANIFEST.in`.
-3.  **CI/CD**: Create `.github/workflows/` files.
-4.  **Documentation**: Update `README.md` with "How to Release" section (for maintainers).
+```bash
+node ../examples/js/batch-example.js
+```
 
-## Senior Engineer Details
+### 3. Version & Release
 
-- **Idempotency**: Workflows should fail gracefully if version exists.
-- **Security**: Use OIDC for PyPI (if possible) or Secrets.
-- **Provenance**: Enable npm provenance.
-- **Verification**: checksums for downloaded models (future).
+**Crucial**: `pnpm publish` checks for a clean git state. Commit your version bump _before_ running this.
 
-Let's start by updating the package configurations.
+```bash
+pnpm version patch # or minor
+git commit -am "chore(js): bump version"
+pnpm publish --access public
+```
+
+---
+
+## Go (`github.com/MonDevHub/monocr-onnx/go`)
+
+Go modules are just git tags. But we have a mono-repo, so tags are namespaced.
+
+### 1. Tidy Up
+
+Never ship a `go.mod` that hasn't been tidied.
+
+```bash
+cd go
+go mod tidy
+go test -v ./...
+```
+
+### 2. Tag It
+
+The tag **must** look like `go/vX.Y.Z`. If you tag it `vX.Y.Z`, Go won't find the module in the subdirectory.
+
+```bash
+# assuming you're in root
+git tag go/v0.1.1
+git push origin go/v0.1.1
+```
+
+### 3. Verify
+
+Ask the proxy to index it immediately.
+
+```bash
+GOPROXY=proxy.golang.org go list -m github.com/MonDevHub/monocr-onnx/go@v0.1.1
+```

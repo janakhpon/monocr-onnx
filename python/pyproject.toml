@@ -25,8 +25,10 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/janakh/monocr-onnx"
-Issues = "https://github.com/janakh/monocr-onnx/issues"
+Homepage = "https://github.com/MonDevHub/monocr-onnx"
+Repository = "https://github.com/MonDevHub/monocr-onnx"
+Issues = "https://github.com/MonDevHub/monocr-onnx/issues"
+Documentation = "https://github.com/MonDevHub/monocr-onnx/tree/main/python"
 
 [project.scripts]
 monocr = "monocr_onnx.cli:main"

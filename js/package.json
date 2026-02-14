@@ -1,6 +1,6 @@
 {
   "name": "monocr",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Cross-platform Mon (mnw) language OCR using ONNX Runtime. Supports Node.js.",
   "main": "src/index.js",
   "bin": {
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/janakh/monocr-onnx.git",
+    "url": "git+https://github.com/MonDevHub/monocr-onnx.git",
     "directory": "js"
   },
   "keywords": [
@@ -21,9 +21,9 @@
   "author": "Janakh",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/janakh/monocr-onnx/issues"
+    "url": "https://github.com/MonDevHub/monocr-onnx/issues"
   },
-  "homepage": "https://github.com/janakh/monocr-onnx/tree/main/js#readme",
+  "homepage": "https://github.com/MonDevHub/monocr-onnx/tree/main/js#readme",
   "files": [
     "src/",
     "bin/",
@@ -33,8 +33,12 @@
   "dependencies": {
     "commander": "^11.1.0",
     "onnxruntime-node": "^1.24.1",
-    "pdf2pic": "^3.2.0",
+    "pdf-img-convert": "^2.0.0",
     "sharp": "^0.32.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
   },
   "publishConfig": {
     "access": "public"

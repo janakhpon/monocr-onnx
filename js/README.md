@@ -1,6 +1,6 @@
-# monocr
+# MonOCR (JavaScript SDK)
 
-Mon language (mnw) OCR for Node.js.
+The professional JavaScript SDK for Mon language OCR, powered by ONNX Runtime. Designed for high-performance server-side and desktop Node.js applications.
 
 ## Installation
 
@@ -8,70 +8,70 @@ Mon language (mnw) OCR for Node.js.
 npm install monocr
 ```
 
-## Quick Start
+## Features
+
+- **Unified API**: Synchronized with Python and Go equivalents.
+- **Auto-Model Management**: Leverages [MonDevHub/monocr](https://huggingface.co/janakhpon/monocr) for automated model delivery.
+- **PDF Support**: Intelligent document segmentation and multi-page processing.
+- **Zero Dependencies**: Core OCR logic is lean and optimized.
+
+## API Reference
+
+### `read_image(imagePath, [options])`
+
+Recognizes text from a single image.
+
+- `imagePath`: String path to the image file.
+- `options`: Optional overrides for model/charset paths.
+- **Returns**: `Promise<string>`
+
+### `read_images(imagePaths, [options])`
+
+Recognizes text from multiple images.
+
+- **Returns**: `Promise<string[]>`
+
+### `read_pdf(pdfPath, [options])`
+
+Converts and recognizes text from all pages of a PDF.
+
+- **Returns**: `Promise<string[]>` (Array of strings per page)
+
+### `read_image_with_accuracy(imagePath, groundTruth, [options])`
+
+Performs OCR and calculates Levenshtein accuracy.
+
+- **Returns**: `Promise<{text: string, accuracy: number}>`
+
+## Usage Example
 
 ```javascript
 const { read_image } = require("monocr");
 
-// Automatically downloads model on first run
-const text = await read_image("image.jpg");
-console.log(text);
+async function main() {
+  const text = await read_image("scanned_text.png");
+  console.log(text);
+}
+
+main();
 ```
 
-## API
-
-### `read_image(imagePath, [modelPath], [charsetPath])`
-
-Recognizes text from an image file.
-
-- `imagePath` (string): Path to image file.
-- `modelPath` (string, optional): Path to ONNX model. Defaults to `~/.monocr/models/monocr.onnx`.
-- `charsetPath` (string, optional): Path to charset file. Defaults to bundled charset.
-
-Returns: `Promise<string>`
-
-### `read_pdf(pdfPath, [modelPath], [charsetPath])`
-
-Recognizes text from a PDF file.
-
-- `pdfPath` (string): Path to PDF file.
-- `modelPath` (string, optional): As above.
-- `charsetPath` (string, optional): As above.
-
-Returns: `Promise<string[]>` (Array of text per page)
-
-### `read_image_with_accuracy(imagePath, groundTruth, [modelPath], [charsetPath])`
-
-Recognizes text and calculates accuracy against ground truth.
-
-- `imagePath` (string): Path to image file.
-- `groundTruth` (string): Expected text.
-
-Returns: `Promise<{text: string, accuracy: number}>`
-
-## CLI Usage
-
-The package includes a `monocr` command-line tool.
+## CLI Interface
 
 ```bash
-# Download model to cache (optional, happens automatically on first use)
-monocr download
+# Global installation for CLI usage
+npm install -g monocr
 
-# Recognize single image
+# Process an image
 monocr image input.jpg
 
-# Recognize PDF
+# Process a PDF
 monocr pdf document.pdf
-
-# Batch process directory
-monocr batch ./images -o results.json
 ```
 
-## Model Files
+## Maintenance
 
-The ONNX model (`monocr.onnx`) is downloaded automatically to `~/.monocr/models/` on first use. The charset file is bundled with the package.
-
-To use a custom model, provide the `modelPath` argument to the API functions or CLI.
+Maintained by [MonDevHub](https://github.com/MonDevHub).
 
 ## License
 

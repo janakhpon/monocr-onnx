@@ -1,65 +1,69 @@
-# MonOCR (Multi-Language SDK)
+# MonOCR (Universal SDK)
 
-Universal OCR package for the Mon (mnw) language, powered by ONNX Runtime.
+MonOCR is a high-performance, cross-platform Optical Character Recognition (OCR) engine for the Mon language (mnw). Powered by **ONNX Runtime**, it provides a unified API for image and PDF text recognition across multiple programming environments.
 
-This repository contains SDKs for multiple languages, providing a unified API for high-performance OCR on images and PDFs.
+This repository is the central hub for the MonOCR SDKs, maintained by the [MonDevHub](https://github.com/MonDevHub) organization.
 
-## Supported Languages
+## Supported Platforms
 
-| Language       | Directory            | Package                            | Status     |
-| :------------- | :------------------- | :--------------------------------- | :--------- |
-| **JavaScript** | [`js/`](js/)         | `monocr` (npm)                     | ✅ Ready   |
-| **Python**     | [`python/`](python/) | `monocr-onnx` (PyPI)               | ✅ Ready   |
-| **Go**         | [`go/`](go/)         | `github.com/janakh/monocr-onnx/go` | ✅ Ready   |
-| **Rust**       | [`rust/`](rust/)     | `monocr` (crates.io)               | 🚧 Planned |
+| SDK                    | Directory            | Registry                                                   | Status        |
+| :--------------------- | :------------------- | :--------------------------------------------------------- | :------------ |
+| **JavaScript/Node.js** | [`js/`](js/)         | [npm: monocr](https://www.npmjs.com/package/monocr)        | ✅ Production |
+| **Python**             | [`python/`](python/) | [PyPI: monocr-onnx](https://pypi.org/project/monocr-onnx/) | ✅ Production |
+| **Go**                 | [`go/`](go/)         | `github.com/MonDevHub/monocr-onnx/go`                      | ✅ Production |
+| **Rust**               | [`rust/`](rust/)     | -                                                          | 🚧 Planned    |
 
-## Features
+## Core Features
 
-- **Unified API**: Consistent `read_image` and `read_pdf` functions across all languages.
-- **Auto-Download**: Automatically fetches the 56MB `monocr.onnx` model from HuggingFace on first use.
-- **Full Page Support**: Built-in layout analysis to handle multi-line documents.
-- **High Performance**: Optimized ONNX Runtime inference with connectionist temporal classification (CTC) decoding.
+- **Unified API**: Identical `read_image` and `read_pdf` patterns across all languages.
+- **Zero-Config Model Management**: Automatically fetches and caches the 56MB ONNX model from Hugging Face on first use.
+- **Layout Awareness**: Built-in line segmentation for full-page document processing.
+- **Optimized Performance**: Leverages modern SIMD/GPU acceleration via ONNX Runtime.
 
-## Quick Start
+## Quick Installation
 
-### JavaScript
-
-```bash
-npm install monocr
-```
-
-```js
-const { read_image } = require("monocr");
-console.log(await read_image("doc.jpg"));
-```
-
-### Python
+### JavaScript (npm)
 
 ```bash
-pip install monocr-onnx
+npm install monocr || pnpm add monocr
 ```
+
+### Python (pip or uv)
+
+```bash
+pip install monocr-onnx || uv add monocr-onnx
+```
+
+### Go (modules)
+
+```bash
+go get github.com/MonDevHub/monocr-onnx/go
+```
+
+## Quick Start Example (Python)
 
 ```python
 from monocr_onnx import read_image
-print(read_image("doc.jpg"))
+
+# Model is automatically downloaded and cached at ~/.monocr/models/
+text = read_image("scanned_document.jpg")
+print(text)
 ```
 
-### Go
+## Documentation
 
-```bash
-go get github.com/janakh/monocr-onnx/go
-```
+Each SDK contains its own detailed documentation and examples:
 
-```go
-text, _ := monocr.ReadImage("doc.jpg")
-fmt.Println(text)
-```
+- [JavaScript Documentation](js/README.md)
+- [Python Documentation](python/README.md)
+- [Go Documentation](go/README.md)
+- [Publishing & Deployment Guide](docs/publishing.md)
 
-## Model Info
+## Model Hub
 
-The model is hosted on HuggingFace: [janakh/monocr](https://huggingface.co/janakh/monocr).
-It is automatically cached to `~/.monocr/models/`.
+The underlying weights and multi-format exports (ONNX, TFLite, PyTorch) are hosted on Hugging Face:
+[MonDevHub/monocr](https://huggingface.co/janakhpon/monocr)
 
 ## License
 
-MIT
+MIT License. See [LICENSE](LICENSE) for details.
