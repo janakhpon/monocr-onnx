@@ -119,10 +119,3 @@ Ask the proxy to index it immediately.
 ```bash
 GOPROXY=proxy.golang.org go list -m github.com/MonDevHub/monocr-onnx/go@v0.1.1
 ```
-
----
-
-## 🪄 Final Steps
-
-1.  **Bump local versions**: Ensure `task.md` or internal docs reflect the new numbers.
-2.  **Changelog**: If you didn't write a changelog, did the release really happen? (Update `CHANGELOG.md` if we have one, or release notes on GitHub).
