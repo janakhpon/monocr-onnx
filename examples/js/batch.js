@@ -1,16 +1,19 @@
-const { MonOCR } = require('../src/index');
-const path = require('path');
-const fs = require('fs');
+import { MonOCR } from 'monocr';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function main() {
     const modelPath = path.join(__dirname, '../../model/monocr.onnx');
     const charsetPath = path.join(__dirname, '../../model/charset.txt');
-    const imagesDir = path.join(__dirname, '../../../preview_monocr/data/images');
+    const imagesDir = path.join(__dirname, '../../data/images');
 
-    
     console.log('MonOCR Batch Processing Example\n');
     
-    const ocr = new MonOCR(modelPath, charsetPath);
+    const ocr = new MonOCR();
     await ocr.init();
     
     const files = fs.readdirSync(imagesDir)
