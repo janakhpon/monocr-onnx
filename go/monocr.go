@@ -13,6 +13,7 @@ import (
 
 	"github.com/MonDevHub/monocr-onnx/go/pkg/model"
 	"github.com/MonDevHub/monocr-onnx/go/pkg/predictor"
+	"github.com/MonDevHub/monocr-onnx/go/pkg/segmenter"
 )
 
 //go:embed charset.txt
@@ -31,7 +32,7 @@ func ReadImage(imagePath string) (string, error) {
 		return "", err
 	}
 
-	return ReadImageWithModel(imagePath, modelPath, embeddedCharset)
+	return ReadImageWithModel(imagePath, modelPath, strings.TrimSpace(embeddedCharset))
 }
 
 // ReadImages recognizes text from multiple image files.
@@ -117,7 +118,7 @@ func ReadPDF(pdfPath string) ([]string, error) {
 		return nil, err
 	}
 
-	return readPDFWithModel(pdfPath, modelPath, embeddedCharset)
+	return readPDFWithModel(pdfPath, modelPath, strings.TrimSpace(embeddedCharset))
 }
 
 // ReadPDFs recognizes text from multiple PDF files.
@@ -140,7 +141,7 @@ func ReadPDFs(pdfPaths []string) ([][]string, error) {
 
 	var results [][]string
 	for _, path := range pdfPaths {
-		pages, err := readPDFWithModel(path, modelPath, embeddedCharset)
+		pages, err := readPDFWithModel(path, modelPath, strings.TrimSpace(embeddedCharset))
 		if err != nil {
 			return nil, err
 		}
@@ -175,15 +176,44 @@ func readPDFWithModel(pdfPath, modelPath, charset string) ([]string, error) {
 	}
 	defer pred.Close()
 
+	seg := segmenter.NewLineSegmenter(10, 3)
+
 	var results []string
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".png") {
 			imgPath := filepath.Join(tempDir, file.Name())
-			text, err := predictFile(pred, imgPath)
+
+			// Open image for segmentation
+			f, err := os.Open(imgPath)
 			if err != nil {
 				continue
 			}
-			results = append(results, text)
+			img, _, err := image.Decode(f)
+			f.Close()
+			if err != nil {
+				continue
+			}
+
+			// Segment lines
+			lines, err := seg.Segment(img)
+			if err != nil || len(lines) == 0 {
+				// Fallback to full page prediction (single line assumption)
+				text, err := pred.Predict(img)
+				if err == nil {
+					results = append(results, text)
+				}
+				continue
+			}
+
+			// Predict each line
+			var pageLines []string
+			for _, line := range lines {
+				text, err := pred.Predict(line.Img)
+				if err == nil {
+					pageLines = append(pageLines, text)
+				}
+			}
+			results = append(results, strings.Join(pageLines, "\n"))
 		}
 	}
 
@@ -225,23 +255,23 @@ func min(a, b int) int {
 func calculateAccuracy(pred, truth string) float64 {
 	p := []rune(pred)
 	t := []rune(truth)
-	
+
 	if len(t) == 0 {
 		if len(p) == 0 {
 			return 100.0
 		}
 		return 0.0
 	}
-	
+
 	dist := levenshtein(p, t)
 	maxLen := len(p)
 	if len(t) > maxLen {
 		maxLen = len(t)
 	}
-	
+
 	if maxLen == 0 {
 		return 100.0
 	}
-	
+
 	return (1.0 - float64(dist)/float64(maxLen)) * 100.0
 }

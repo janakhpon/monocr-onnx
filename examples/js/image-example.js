@@ -9,7 +9,7 @@ async function main() {
     console.log('MonOCR Image Example (using published npm package)\n');
     
     // Test image
-    const imagePath = join(__dirname, '../../data/images/test_0005_h71.png');
+    const imagePath = join(__dirname, '../../data/images/test_0012_h86.png');
     
     console.log('Reading image:', imagePath);
     console.log('Model: Auto-downloading/cached');
