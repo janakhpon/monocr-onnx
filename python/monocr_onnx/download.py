@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 
 MODEL_URLS = {
-    "onnx": "https://huggingface.co/janakh/monocr/resolve/main/monocr.onnx",
-    "tflite": "https://huggingface.co/janakh/monocr/resolve/main/monocr.tflite",
+    "onnx": "https://huggingface.co/janakh/monocr/resolve/main/onnx/monocr.onnx",
+    "tflite": "https://huggingface.co/janakh/monocr/resolve/main/tflite/monocr.tflite",
     "charset": "https://huggingface.co/janakh/monocr/resolve/main/charset.txt",
 }
 
